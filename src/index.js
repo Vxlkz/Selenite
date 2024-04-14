@@ -6,10 +6,17 @@ import { baremuxPath } from "@mercuryworkshop/bare-mux";
 import { join } from "node:path";
 import { hostname } from "node:os";
 import wisp from "wisp-server-node";
-let publicPath = "./public";
-
+let publicPath = "./public/";
+import checkPass from "./api/verify.js";
 const app = express();
 // Load our publicPath first and prioritize it over UV.
+app.use((req, res, next) => {
+  if (!checkPass(req) && req.path != "/verify.html") {
+    res.send("<script>document.cookie = `password=${prompt('Enter the password')}`;location.reload();</script>");
+  } else {
+    next();
+  }
+});
 app.use(express.static(publicPath));
 // Load vendor files last.
 // The vendor's uv.config.js won't conflict with our uv.config.js inside the publicPath directory.
@@ -31,10 +38,8 @@ server.on("request", (req, res) => {
   app(req, res);
 });
 server.on("upgrade", (req, socket, head) => {
-  if (req.url.endsWith("/wisp/"))
-    wisp.routeRequest(req, socket, head);
-  else
-    socket.end();
+  if (req.url.endsWith("/wisp/")) wisp.routeRequest(req, socket, head);
+  else socket.end();
 });
 
 let port = parseInt(process.env.PORT || "");
@@ -50,7 +55,8 @@ server.on("listening", () => {
   console.log(`\thttp://localhost:${address.port}`);
   console.log(`\thttp://${hostname()}:${address.port}`);
   console.log(
-    `\thttp://${address.family === "IPv6" ? `[${address.address}]` : address.address
+    `\thttp://${
+      address.family === "IPv6" ? `[${address.address}]` : address.address
     }:${address.port}`
   );
 });
@@ -68,3 +74,4 @@ function shutdown() {
 server.listen({
   port,
 });
+
